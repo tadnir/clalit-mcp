@@ -1,0 +1,84 @@
+import { describe, expect, test } from "vitest";
+import {
+  CAPTCHA_CHECK_TIMEOUT_MS,
+  captchaPage,
+  escapeHtml,
+  errorPage,
+  failureDetailsBlock,
+  HTTP_LOGIN_TTL_MS,
+  idPage,
+  otpPage,
+  takeOrWait,
+  waitForAnswer,
+  waitingPage,
+} from "../src/http-login.js";
+
+describe("http-login helpers", () => {
+  test("TTL is at least 30 minutes", () => {
+    expect(HTTP_LOGIN_TTL_MS).toBeGreaterThanOrEqual(30 * 60 * 1000);
+  });
+
+  test("CAPTCHA check timeout is ~30 seconds", () => {
+    expect(CAPTCHA_CHECK_TIMEOUT_MS).toBe(30_000);
+  });
+
+  test("escapeHtml and pages render expected fields", () => {
+    expect(escapeHtml("<x>")).toBe("&lt;x&gt;");
+    expect(idPage("csrf-token")).toContain('name="id"');
+    expect(captchaPage("csrf-token", { hasImage: true })).toContain("/captcha.png");
+    expect(captchaPage("csrf-token", { hasImage: false })).toContain("CAPTCHA");
+    expect(otpPage("csrf-token", "Enter SMS")).toContain('name="otp"');
+    expect(waitingPage("Checking CAPTCHA…", "Waiting")).toContain("Checking CAPTCHA");
+    // Waiting pages must auto-refresh so OTP / errors appear without a manual reload.
+    expect(waitingPage("Checking CAPTCHA…", "Waiting")).toContain('http-equiv="refresh"');
+    expect(waitingPage("Checking CAPTCHA…", "Waiting")).toContain('content="2"');
+    expect(errorPage("boom")).toContain("clalit-mcp login");
+  });
+
+  test("takeOrWait buffers answer when no waiter yet (CAPTCHA Continue race)", async () => {
+    const slot: { value?: string; pending?: { resolve: (v: string) => void; reject: (e: Error) => void } } = {};
+    takeOrWait(slot, "AB12");
+    expect(slot.value).toBe("AB12");
+    await expect(waitForAnswer(slot)).resolves.toBe("AB12");
+    expect(slot.value).toBeUndefined();
+  });
+
+  test("takeOrWait resolves an existing waiter (normal order)", async () => {
+    const slot: { value?: string; pending?: { resolve: (v: string) => void; reject: (e: Error) => void } } = {};
+    const answered = waitForAnswer(slot);
+    takeOrWait(slot, "XY99");
+    await expect(answered).resolves.toBe("XY99");
+    expect(slot.value).toBeUndefined();
+    expect(slot.pending).toBeUndefined();
+  });
+
+  test("second takeOrWait while buffered keeps latest answer", async () => {
+    const slot: { value?: string; pending?: { resolve: (v: string) => void; reject: (e: Error) => void } } = {};
+    takeOrWait(slot, "first");
+    takeOrWait(slot, "second");
+    await expect(waitForAnswer(slot)).resolves.toBe("second");
+  });
+
+  test("error page shows Hebrew + English why and dump paths (escaped)", () => {
+    const html = errorPage("OTP finished but LabsTestList still redirects to login.", {
+      why: "otp_redisplayed_with_error",
+      en: "Portal redisplayed the OTP form with a validation message — likely a wrong or expired SMS code.",
+      he: "הפורטל הציג שוב את טופס הקוד עם הודעת שגיאה — כנראה קוד SMS שגוי או שפג תוקפו.",
+      signals: ["otp_entry_slow"],
+      dumpPaths: ["/Users/me/.config/clalit-mcp/otp-redisplay-x.json", "/tmp/<script>.json"],
+    });
+    expect(html).toContain("ההתחברות נעצרה");
+    expect(html).toContain("למה:");
+    expect(html).toContain("כנראה קוד SMS שגוי");
+    expect(html).toContain("Why:");
+    expect(html).toContain("wrong or expired");
+    expect(html).toContain("otp_redisplayed_with_error");
+    expect(html).toContain("otp_entry_slow");
+    expect(html).toContain("/Users/me/.config/clalit-mcp/otp-redisplay-x.json");
+    expect(html).toContain("/tmp/&lt;script&gt;.json");
+    expect(html).not.toContain("<script>.json");
+    expect(failureDetailsBlock(undefined)).toBe("");
+    expect(errorPage("boom")).not.toContain("class=\"why\"");
+  });
+});
+
