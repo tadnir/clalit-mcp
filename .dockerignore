@@ -1,0 +1,6 @@
+node_modules
+.git
+vendor
+scratch
+**/test
+docs
