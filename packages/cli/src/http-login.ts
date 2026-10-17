@@ -89,7 +89,7 @@ export function idPage(csrf: string, error?: string, presetId?: string): string 
     `<h1>Sign in to Clalit</h1>
 <p>${escapeHtml(CLIENT_LABEL)} needs your own Clalit session on this machine.</p>
 ${errorBlock(error)}
-<form method="post" action="/">
+<form method="post" action="./">
 <input type="hidden" name="csrf" value="${escapeHtml(csrf)}"/>
 <input type="hidden" name="step" value="id"/>
 <label for="id">Israeli ID number (תעודת זהות)</label>
@@ -105,7 +105,7 @@ export function captchaPage(
   opts: { hasImage: boolean; fieldHint?: string; error?: string },
 ): string {
   const img = opts.hasImage
-    ? `<p><img class="captcha" src="/captcha.png" alt="CAPTCHA from Clalit portal"/></p>`
+    ? `<p><img class="captcha" src="captcha.png" alt="CAPTCHA from Clalit portal"/></p>`
     : `<p class="note">CAPTCHA image could not be loaded here. Open the Clalit portal in another tab on this machine if needed, then type the characters below.</p>`;
   const hint = opts.fieldHint ? `<p class="note">Captcha field: ${escapeHtml(opts.fieldHint)}</p>` : "";
   return layout(
@@ -115,7 +115,7 @@ export function captchaPage(
 ${errorBlock(opts.error)}
 ${img}
 ${hint}
-<form method="post" action="/">
+<form method="post" action="./">
 <input type="hidden" name="csrf" value="${escapeHtml(csrf)}"/>
 <input type="hidden" name="step" value="captcha"/>
 <label for="captcha">CAPTCHA text</label>
@@ -131,7 +131,7 @@ export function otpPage(csrf: string, message: string, error?: string): string {
     `<h1>Enter SMS code</h1>
 <p>${escapeHtml(message)}</p>
 ${errorBlock(error)}
-<form method="post" action="/">
+<form method="post" action="./">
 <input type="hidden" name="csrf" value="${escapeHtml(csrf)}"/>
 <input type="hidden" name="step" value="otp"/>
 <label for="otp">SMS OTP</label>
@@ -198,7 +198,7 @@ function sendHtml(res: ServerResponse, status: number, html: string, extra: Reco
 }
 
 /** PRG: POST → 303 → GET so Refresh/double-Continue cannot replay the POST. */
-function redirectSeeOther(res: ServerResponse, location = "/"): void {
+function redirectSeeOther(res: ServerResponse, location = "./"): void {
   res.writeHead(303, {
     location,
     "cache-control": "no-store",

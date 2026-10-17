@@ -167,7 +167,7 @@ export class SessionManager {
         if (!this.#login.running) this.#pendingLengthMs = length[1];
         this.#login.start();
       }
-      res.writeHead(303, { location: "/", "cache-control": "no-store" }).end();
+      res.writeHead(303, { location: "./", "cache-control": "no-store" }).end();
       return;
     }
     // While a sign-in runs, every other request is its page.

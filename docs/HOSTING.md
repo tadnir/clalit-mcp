@@ -35,7 +35,7 @@ Run the proxy from the repository root (or set the working directory), on a resi
 
 ## The sign-in page
 
-With `CLALIT_LOGIN_URL` set, the page starts with the server and every "please sign in" answer links to that URL. Route it through a reverse proxy that puts your own sign-in in front (for example forward authentication), and serve it at the root of its own host name: the page's forms post to `/`.
+With `CLALIT_LOGIN_URL` set, the page starts with the server and every "please sign in" answer links to that URL. Route it through a reverse proxy that puts your own sign-in in front (for example forward authentication), either at the root of a host name or under a path that the reverse proxy strips (for example `https://mcp.example.com/clalit/` to `/`). The page links and posts only to relative paths, so `CLALIT_LOGIN_URL` must end in `/`.
 
 Inside a container, `CLALIT_LOGIN_HOST=0.0.0.0` lets the reverse proxy reach it; don't publish that port anywhere else.
 
