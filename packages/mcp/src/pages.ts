@@ -54,7 +54,7 @@ function signInForm(csrf: string, label: string, secondary: boolean): string {
   const options = Object.entries(SESSION_LENGTHS)
     .map(([value, [text]]) => `<option value="${value}"${value === DEFAULT_SESSION_LENGTH ? " selected" : ""}>${text}</option>`)
     .join("");
-  return `<form method="post" action="/sign-in"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"/>
+  return `<form method="post" action="sign-in"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"/>
 <label>Stay signed in for<select name="length">${options}</select></label>
 <button type="submit"${secondary ? ' class="secondary"' : ""}>${escapeHtml(label)}</button></form>`;
 }
@@ -88,7 +88,7 @@ export function statusPage(status: KeeperStatus, csrf: string): string {
 </dl>
 ${status.lastError ? `<p class="err">Last keep-alive error: ${escapeHtml(status.lastError)}</p>` : ""}
 ${signInForm(csrf, "Sign in again", true)}
-<form method="post" action="/sign-out"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"/><button type="submit" class="secondary">Sign out</button></form>`,
+<form method="post" action="sign-out"><input type="hidden" name="csrf" value="${escapeHtml(csrf)}"/><button type="submit" class="secondary">Sign out</button></form>`,
   );
 }
 
