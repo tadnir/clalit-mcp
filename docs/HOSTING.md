@@ -23,7 +23,7 @@ Any proxy that starts the stdio server once and shares that one process between 
       "env": {
         "CLALIT_CONFIG_DIR": "/data/clalit",
         "CLALIT_LOGIN_HOST": "0.0.0.0",
-        "CLALIT_LOGIN_URL": "https://clalit-login.example.com/"
+        "CLALIT_LOGIN_URL": "https://mcp.example.com/clalit/login/"
       },
       "options": { "authTokens": ["<random token for client A>", "<random token for client B>"] }
     }
@@ -35,7 +35,7 @@ Run the proxy from the repository root (or set the working directory), on a resi
 
 ## The sign-in page
 
-With `CLALIT_LOGIN_URL` set, the page starts with the server and every "please sign in" answer links to that URL. Route it through a reverse proxy that puts your own sign-in in front (for example forward authentication), and serve it at the root of its own host name: the page's forms post to `/`.
+With `CLALIT_LOGIN_URL` set, the page starts with the server and every "please sign in" answer links to that URL. Route it through a reverse proxy that puts your own sign-in in front (for example forward authentication), either at the root of a host name or under a path. Its links and forms are relative, so under a path, strip the prefix in the reverse proxy and give `CLALIT_LOGIN_URL` with the trailing slash (`https://mcp.example.com/clalit/login/`).
 
 Inside a container, `CLALIT_LOGIN_HOST=0.0.0.0` lets the reverse proxy reach it; don't publish that port anywhere else.
 
