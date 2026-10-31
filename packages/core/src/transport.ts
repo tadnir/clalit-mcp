@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { Cookie, CookieJar, type SerializedCookieJar } from "tough-cookie";
 import {
   ALLOWED_ORIGINS,
@@ -21,6 +23,8 @@ export interface TransportOptions {
   timeoutMs?: number;
   now?: () => number;
   minGapMs?: number;
+  /** User agent for every request; the session's own when it carries one, else an ordinary Mac Chrome. */
+  userAgent?: string;
   /**
    * Test seam: after removeAllCookies during restore, before cookies are re-added.
    * Receives the mid-restore cookie count (should be 0). Must not call queue-bound
@@ -45,6 +49,10 @@ export interface BrowserCookieSeed {
   sameSite?: "Strict" | "Lax" | "None" | string;
   expires?: number;
 }
+
+/** What requests say they are when the session does not say otherwise. */
+export const DEFAULT_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 function originOf(url: string): string {
   return new URL(url).origin;
@@ -102,6 +110,7 @@ export class ClalitTransport {
   readonly #timeoutMs: number;
   readonly #now: () => number;
   readonly #minGapMs: number;
+  readonly #userAgent: string;
   readonly #onAfterCookieClear?: (cookieCount: number) => Promise<void>;
   #lastRequestAt = 0;
   #authenticatedAt: string | undefined;
@@ -114,8 +123,12 @@ export class ClalitTransport {
     this.#timeoutMs = options.timeoutMs ?? 30_000;
     this.#now = options.now ?? Date.now;
     this.#minGapMs = options.minGapMs ?? MIN_REQUEST_GAP_MS;
+    this.#userAgent = options.userAgent ?? options.session?.userAgent ?? DEFAULT_USER_AGENT;
     this.#idleTtlMs = options.session?.idleTtlMs ?? DEFAULT_IDLE_TTL_MS;
     this.#authenticatedAt = options.session?.authenticatedAt;
+    // A saved session that has been used since sign-in (a keep-alive, an export) is idle from then, not from sign-in.
+    const lastUsed = options.session?.lastUsedAt ? Date.parse(options.session.lastUsedAt) : NaN;
+    if (Number.isFinite(lastUsed) && lastUsed > 0) this.#lastRequestAt = lastUsed;
     this.#onAfterCookieClear = options.onAfterCookieClear;
     // Await restore before any request: enqueue on the same serial queue (not fire-and-forget).
     if (options.session?.cookies) {
@@ -238,6 +251,8 @@ export class ClalitTransport {
         cookies: await this.#jar.serialize(),
         authenticatedAt: this.#authenticatedAt,
         idleTtlMs: this.#idleTtlMs,
+        ...(this.#userAgent !== DEFAULT_USER_AGENT ? { userAgent: this.#userAgent } : {}),
+        ...(this.#lastRequestAt ? { lastUsedAt: new Date(this.#lastRequestAt).toISOString() } : {}),
       };
     });
   }
@@ -268,13 +283,8 @@ export class ClalitTransport {
       const cookieHeader = await this.#jar.getCookieString(absolute);
       const headers = new Headers(init.headers);
       if (cookieHeader && !headers.has("cookie")) headers.set("cookie", cookieHeader);
-      if (!headers.has("user-agent")) {
-        // Ordinary browser UA; Imperva rejects datacenter/bot fingerprints.
-        headers.set(
-          "user-agent",
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        );
-      }
+      // Ordinary browser UA; Imperva rejects datacenter/bot fingerprints.
+      if (!headers.has("user-agent")) headers.set("user-agent", this.#userAgent);
       if (!headers.has("accept-language")) headers.set("accept-language", "he-IL,he;q=0.9,en;q=0.8");
 
       const controller = new AbortController();
@@ -288,6 +298,7 @@ export class ClalitTransport {
         });
         this.#lastRequestAt = this.#now();
         await this.#storeSetCookies(absolute, response);
+        await debugTee(absolute, init.method ?? "GET", response);
 
         if (response.status === 401 || response.status === 403) {
           const peek = await response.clone().text().catch(() => "");
@@ -406,4 +417,27 @@ export function responseSetCookieNames(response: Response): string[] {
   return setCookies
     .map(setCookieHeaderName)
     .filter((n): n is string => Boolean(n));
+}
+
+/**
+ * CLALIT_DEBUG_DIR: when set, every response body is also written there as
+ * `<n>_<METHOD>_<path>.<ext>` (mode 0600) so a reader can be checked against
+ * what the portal actually answered. Bodies hold the member's record; the
+ * directory must stay private. Headers and cookies are never written.
+ */
+let debugSeq = 0;
+async function debugTee(url: string, method: string, response: Response): Promise<void> {
+  const dir = process.env.CLALIT_DEBUG_DIR;
+  if (!dir) return;
+  try {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const u = new URL(url);
+    const ct = response.headers.get("content-type") ?? "";
+    const ext = /pdf|octet/i.test(ct) ? "bin" : /json/i.test(ct) ? "json" : "html";
+    const name = `${String(++debugSeq).padStart(3, "0")}_${method.toUpperCase()}_${response.status}_${u.pathname.replace(/^\/OnlineWeb\//i, "").replace(/[^\w.-]+/g, "_")}.${ext}`;
+    const body = ext === "bin" ? Buffer.from(await response.clone().arrayBuffer()) : await response.clone().text();
+    writeFileSync(join(dir, name), body, { mode: 0o600 });
+  } catch {
+    /* debugging never fails a request */
+  }
 }

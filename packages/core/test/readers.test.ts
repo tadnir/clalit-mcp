@@ -48,7 +48,7 @@ describe("ClalitReaders against fixtures", () => {
     expect(labs[0]!.refToken).toBeTruthy();
 
     const result = await readers.getLabResult(labs[0]!.refToken!);
-    expect(result.analytes[0]!.name).toBe("המוגלובין");
+    expect(result.analytes[0]!.name).toBe("PT-INR");
 
     // document path: detail HTML then PDF response — swap map mid-flight via subclass
     let detailHits = 0;
@@ -385,7 +385,6 @@ describe("ClalitReaders listPrescriptions pagination", () => {
     expect(bodies).toHaveLength(1);
   });
 });
-
 describe("ClalitReaders listDocuments", () => {
   // A portal that, like the real one, shows only the first 10 matching rows.
   function portal(dates: string[]) {

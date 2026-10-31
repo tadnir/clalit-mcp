@@ -51,6 +51,8 @@ const AUTH_MESSAGES: Record<string, string> = {
     "Checking CAPTCHA timed out. Clalit did not reach the SMS OTP step in time. Try again: clalit-mcp login",
   AUTHENTICATION_FAILED: "Clalit sign-in did not complete. Check the login step and try again.",
   OTP_SESSION_INCOMPLETE: otpSessionIncompleteMessage("missing_portal_defense_cookies"),
+  BROWSER_SESSION_INCOMPLETE:
+    "The browser's cookies do not make a signed-in session, so nothing was saved. Finish the sign-in in the browser window and try again.",
 };
 
 /**
@@ -90,8 +92,11 @@ const UPSTREAM_MESSAGES: Record<string, string> = {
   BOT_CHALLENGE:
     "Imperva blocked this host (often Error 16 on datacenter/cloud IPs). Never bypass Imperva.",
   RESPONSE_TOO_LARGE: "The Clalit response was too large to process.",
-  NO_DOCUMENT: "Clalit has no document for this row.",
+  NO_DOCUMENT: "The portal offers no PDF for this result.",
   DOCUMENT_CHECK_FAILED: "Clalit could not prepare this document.",
+  DETAIL_REDIRECTED: "The portal sent the result page elsewhere: the link had expired or its search was no longer the current one.",
+  DETAIL_NOT_FOUND: "The row was not found in the hospital's list when the search was replayed.",
+  PORTAL_TEMPORARY_FAULT: "Clalit answered with its own 'temporary fault, try again later' in place of the results.",
   UPSTREAM_ERROR: "The Clalit request could not be completed.",
 };
 
