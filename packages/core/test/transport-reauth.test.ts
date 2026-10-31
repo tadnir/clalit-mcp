@@ -83,3 +83,34 @@ describe("ClalitTransport login redirect → reauth", () => {
     expect(sawCookie).toContain("session=restored-value");
   });
 });
+
+describe("ClalitTransport idle check with a saved session", () => {
+  const cookies = new CookieJar().serializeSync()!;
+  const hour = 3_600_000;
+  const now = Date.parse("2026-10-31T14:00:00Z");
+
+  test("a session signed in two hours ago but used a minute ago is not idle", () => {
+    const session: ClalitSession = {
+      version: 1,
+      cookies,
+      authenticatedAt: new Date(now - 2 * hour).toISOString(),
+      lastUsedAt: new Date(now - 60_000).toISOString(),
+    };
+    const transport = new ClalitTransport({ session, now: () => now });
+    expect(() => transport.assertNotIdleExpired()).not.toThrow();
+  });
+
+  test("the same session without a last use is idle since sign-in", () => {
+    const session: ClalitSession = { version: 1, cookies, authenticatedAt: new Date(now - 2 * hour).toISOString() };
+    const transport = new ClalitTransport({ session, now: () => now });
+    expect(() => transport.assertNotIdleExpired()).toThrow(ReauthenticationRequired);
+  });
+
+  test("exportSession records the last use", async () => {
+    const fetchMock: typeof fetch = async () => new Response("<html><body>ok</body></html>", { status: 200, headers: { "content-type": "text/html" } });
+    const transport = new ClalitTransport({ fetch: fetchMock, minGapMs: 0, now: () => now });
+    transport.markAuthenticated();
+    await transport.request(PORTAL_ORIGIN + "/OnlineWeb/ServicesForAll/RefreshSession.aspx", { allowLoginHtml: true });
+    expect((await transport.exportSession()).lastUsedAt).toBe(new Date(now).toISOString());
+  });
+});
